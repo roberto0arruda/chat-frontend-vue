@@ -1,19 +1,44 @@
 <script setup>
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth.js'
+
 defineProps({
   msg: {
     type: String,
     required: true,
   },
 })
+
+const authStore = useAuthStore()
+
+const isLoggedIn = computed(() => authStore.loggedIn)
+
+const handleLogout = () => {
+  authStore.logout()
+}
 </script>
 
 <template>
   <div class="greetings">
-    <h1 class="green">{{ msg }}</h1>
+    <div class="flex items-center space-x-2">
+      <div
+        class="w-3 h-3 rounded-full animate-pulse"
+        :class="isLoggedIn ? 'bg-green-500' : 'bg-red-500'"
+      ></div>
+      <span>
+        {{ isLoggedIn ? 'Usuário Logado' : 'Usuário Não Logado' }}
+      </span>
+      <button
+        v-if="isLoggedIn"
+        @click="handleLogout"
+        class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
+      >
+        Sair
+      </button>
+    </div>
+    <h1 class="green">{{ isLoggedIn ? authStore.user.name : msg }}</h1>
     <h3>
-      You’ve successfully created a project with
-      <a href="https://vite.dev/" target="_blank" rel="noopener">Vite</a> +
-      <a href="https://vuejs.org/" target="_blank" rel="noopener">Vue 3</a>.
+      {{ isLoggedIn ? 'Já podes enviar mensagens' : 'Faça login para enviar mensagens e receber respostas.' }}
     </h3>
   </div>
 </template>
