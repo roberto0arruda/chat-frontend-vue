@@ -1,34 +1,127 @@
-<script setup></script>
+<script setup>
+import '@/echo.js'
+import { useAuthStore } from '@/stores/auth.js'
+import { onMounted, ref } from 'vue'
+import { useMutation, useQuery } from '@vue/apollo-composable'
+import gql from 'graphql-tag'
+import { logErrorMessages } from '@vue/apollo-util'
+
+const authStore = useAuthStore()
+
+const messages = ref([])
+const newMessage = ref('')
+
+const {
+  result: queryResult,
+  loading,
+  error,
+} = useQuery(gql`
+  query Messages {
+    messages {
+      id
+      message
+      nickname
+      user {
+        id
+      }
+    }
+  }
+`)
+
+const {
+  mutate: sendMessageMutation,
+  onDone,
+  onError,
+} = useMutation(gql`
+  mutation SendMessage($message: String!) {
+    createMessage(
+      input: { message: $message, public_session: { connect: "1" }, client: { connect: "1" } }
+    ) {
+      id
+      message
+      nickname
+      user {
+        id
+      }
+    }
+  }
+`)
+
+onMounted(() => {
+  if (queryResult.value) {
+    messages.value = queryResult.value.messages
+  }
+
+  window.Echo.channel('chat').listen('MessageCreated', ({ message: e }) => {
+    if (e.user_id == authStore.user.id) return
+    messages.value = [...messages.value, e]
+  })
+})
+
+function send() {
+  if (newMessage.value.trim()) {
+    sendMessageMutation({ message: newMessage.value.trim() })
+    newMessage.value = ''
+  }
+}
+
+onDone(({ data }) => {
+  messages.value = [...messages.value, data.createMessage]
+})
+
+onError((error) => {
+  logErrorMessages(error)
+})
+</script>
 
 <template>
-  <div class="h-screen flex flex-col">
-    <div class="bg-gray-200 flex-1 overflow-y-scroll">
-      <div class="px-4 py-2">
-        <div class="flex items-center mb-2">
-          <img
-            class="w-8 h-8 rounded-full mr-2"
-            src="https://picsum.photos/50/50"
-            alt="User Avatar"
-          />
-          <div class="font-medium">John Doe</div>
-        </div>
-        <div class="bg-white rounded-lg p-2 shadow mb-2 max-w-sm">Hi, how can I help you?</div>
-        <div class="flex items-center justify-end">
-          <div class="bg-blue-500 text-white rounded-lg p-2 shadow mr-2 max-w-sm">
-            Sure, I can help with that.
+  <div class="min-h-screen bg-gray-100 flex flex-col">
+    <!-- Header -->
+    <div class="bg-gray-800 text-white text-center py-4">
+      <h1 class="text-2xl font-bold">Chat: {{ authStore.user.name }}</h1>
+    </div>
+
+    <!-- Chat Messages -->
+    <div class="flex-1 overflow-y-auto px-4 py-2 max-w-3xl mx-auto w-full">
+      <div v-if="loading" class="text-center text-gray-600">Loading...</div>
+
+      <div v-else-if="error" class="text-center text-red-600">Error: {{ error.message }}</div>
+
+      <div v-else-if="messages" class="space-y-3">
+        <div
+          v-for="msg in messages"
+          :key="msg.id"
+          :class="[
+            'flex items-center',
+            msg.user.id === authStore.user.id ? 'justify-end' : 'justify-start',
+          ]"
+        >
+          <div
+            :class="[
+              'rounded-lg p-2 shadow max-w-xs md:max-w-sm',
+              msg.user.id === authStore.user.id ? 'bg-blue-500 text-white' : 'bg-white text-black',
+            ]"
+          >
+            <strong>{{ msg.nickname }}:</strong> {{ msg.message }}
           </div>
-          <img class="w-8 h-8 rounded-full" src="https://picsum.photos/50/50" alt="User Avatar" />
         </div>
       </div>
     </div>
-    <div class="bg-gray-100 px-4 py-2">
-      <div class="flex items-center">
+
+    <!-- Message Input -->
+    <div class="bg-gray-200 px-4 py-2">
+      <div class="flex items-center flex-wrap gap-2 max-w-3xl mx-auto w-full">
         <input
-          class="w-full border rounded-full py-2 px-4 mr-2"
+          v-model="newMessage"
+          class="flex-grow w-full text-black border rounded-full py-2 px-4"
           type="text"
           placeholder="Type your message..."
+          @keyup.enter="send"
         />
-        <button class="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-full">
+        <button
+          class="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-full"
+          @click="send"
+        >
           Send
         </button>
       </div>
