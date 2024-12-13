@@ -1,7 +1,7 @@
 <script setup>
 import '@/echo.js'
 import { useAuthStore } from '@/stores/auth.js'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useMutation, useQuery } from '@vue/apollo-composable'
 import gql from 'graphql-tag'
 import { logErrorMessages } from '@vue/apollo-util'
@@ -48,15 +48,21 @@ const {
 `)
 
 onMounted(() => {
-  if (queryResult.value) {
-    messages.value = queryResult.value.messages
-  }
-
   window.Echo.channel('chat').listen('MessageCreated', ({ message: e }) => {
-    if (e.user_id == authStore.user.id) return
+    if (e.user_id === authStore.user.id) return
     messages.value = [...messages.value, e]
   })
 })
+
+watch(
+  () => queryResult.value,
+  (newResult) => {
+    if (newResult?.messages) {
+      messages.value = newResult.messages
+    }
+  },
+  { immediate: true },
+)
 
 function send() {
   if (newMessage.value.trim()) {
