@@ -10,6 +10,7 @@ const authStore = useAuthStore()
 
 const messages = ref([])
 const newMessage = ref('')
+const messageContainer = ref(null)
 
 const {
   result: queryResult,
@@ -47,11 +48,25 @@ const {
   }
 `)
 
+function scrollToBottom() {
+  if (messageContainer.value) {
+    messageContainer.value.scrollTop = messageContainer.value.scrollHeight
+  }
+}
+
 onMounted(() => {
+  scrollToBottom()
+
   window.Echo.channel('chat').listen('MessageCreated', ({ message: e }) => {
-    if (e.user_id === authStore.user.id) return
+    if (e.user_id == authStore.user.id) return
     messages.value = [...messages.value, e]
   })
+})
+
+watch(messages, (newMessages, oldMessages) => {
+  if (newMessages.length > oldMessages.length) {
+    scrollToBottom()
+  }
 })
 
 watch(
@@ -81,19 +96,22 @@ onError((error) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100 flex flex-col">
+  <div class="h-screen bg-gray-100 flex flex-col">
     <!-- Header -->
     <div class="bg-gray-800 text-white text-center py-4">
       <h1 class="text-2xl font-bold">Chat: {{ authStore.user.name }}</h1>
     </div>
 
     <!-- Chat Messages -->
-    <div class="flex-1 overflow-y-auto px-4 py-2 max-w-3xl mx-auto w-full">
+    <div
+      ref="messageContainer"
+      class="flex-1 overflow-y-auto px-4 py-2 max-w-3xl mx-auto w-full hide-scrollbar"
+    >
       <div v-if="loading" class="text-center text-gray-600">Loading...</div>
 
       <div v-else-if="error" class="text-center text-red-600">Error: {{ error.message }}</div>
 
-      <div v-else-if="messages" class="space-y-3">
+      <div v-else-if="messages" class="space-y-2">
         <div
           v-for="msg in messages"
           :key="msg.id"
@@ -111,15 +129,16 @@ onError((error) => {
             <strong>{{ msg.nickname }}:</strong> {{ msg.message }}
           </div>
         </div>
+        <div class="pt-5 text-center text-gray-600">aguarde para novas mensagens...</div>
       </div>
     </div>
 
     <!-- Message Input -->
-    <div class="bg-gray-200 px-4 py-2">
-      <div class="flex items-center flex-wrap gap-2 max-w-3xl mx-auto w-full">
+    <div class="bg-gray-200 py-2">
+      <div class="flex items-center gap-2 max-w-3xl mx-auto px-4">
         <input
           v-model="newMessage"
-          class="flex-grow w-full text-black border rounded-full py-2 px-4"
+          class="flex-grow text-black border border-gray-300 rounded-full py-2 px-4"
           type="text"
           placeholder="Type your message..."
           @keyup.enter="send"
@@ -135,4 +154,22 @@ onError((error) => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari e Edge */
+}
+
+input {
+  margin: 0;
+  display: block;
+}
+
+button {
+  margin: 0;
+}
+</style>
