@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "@apollo/client": "^3.11.10",
+    "@popperjs/core": "^2.11.8",
     "@vue/apollo-composable": "^4.2.1",
     "@vue/apollo-util": "^4.0.0-beta.6",
+    "chart.js": "^4.4.7",
     "graphql": "^16.9.0",
     "graphql-tag": "^2.12.6",
     "laravel-echo": "^1.17.1",
@@ -24,6 +26,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@tailwindcss/forms": "^0.5.9",
     "@vitejs/plugin-vue": "^5.1.4",
     "@vue/eslint-config-prettier": "^10.1.0",
     "autoprefixer": "^10.4.20",
