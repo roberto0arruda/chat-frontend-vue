@@ -11,6 +11,7 @@ const authStore = useAuthStore()
 const messages = ref([])
 const newMessage = ref('')
 const messageContainer = ref(null)
+const selectedClient = ref(authStore.currentClient?.value)
 
 const {
   result: queryResult,
@@ -31,12 +32,14 @@ const {
 
 const {
   mutate: sendMessageMutation,
+  loading: sendMessageLoading,
+  error: sendMessageError,
   onDone,
   onError,
 } = useMutation(gql`
-  mutation SendMessage($message: String!) {
+  mutation SendMessage($message: String!, $client: ID!) {
     createMessage(
-      input: { message: $message, public_session: { connect: "1" }, client: { connect: "1" } }
+      input: { message: $message, public_session: { connect: "1" }, client: { connect: $client } }
     ) {
       id
       message
@@ -54,7 +57,11 @@ function scrollToBottom() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!authStore.user && authStore.loggedIn) {
+    await authStore.validateToken()
+  }
+
   scrollToBottom()
 
   window.Echo.channel('chat').listen('MessageCreated', ({ message: e }) => {
@@ -81,7 +88,7 @@ watch(
 
 function send() {
   if (newMessage.value.trim()) {
-    sendMessageMutation({ message: newMessage.value.trim() })
+    sendMessageMutation({ message: newMessage.value.trim(), client: selectedClient.value?.id })
     newMessage.value = ''
   }
 }
@@ -92,11 +99,17 @@ onDone(({ data }) => {
 
 onError((error) => {
   logErrorMessages(error)
+
+  console.log(error.graphQLErrors)
+  console.log(error.networkError)
 })
 </script>
 
 <template>
-  <div class="h-screen bg-gray-100 flex flex-col">
+  <div v-if="loadingUser" class="h-screen flex items-center justify-center bg-gray-100">
+    <p>Loading...</p>
+  </div>
+  <div v-else-if="authStore.user" class="h-screen bg-gray-100 flex flex-col">
     <!-- Header -->
     <div class="bg-gray-800 text-white text-center py-4">
       <h1 class="text-2xl font-bold">Chat: {{ authStore.user.name }}</h1>
@@ -129,6 +142,9 @@ onError((error) => {
             <strong>{{ msg.nickname }}:</strong> {{ msg.message }}
           </div>
         </div>
+        <div v-if="sendMessageError" class="text-center text-red-600">
+          Error: {{ sendMessageError.message }}
+        </div>
         <div class="pt-5 text-center text-gray-600">aguarde para novas mensagens...</div>
       </div>
     </div>
@@ -136,6 +152,15 @@ onError((error) => {
     <!-- Message Input -->
     <div class="bg-gray-200 py-2">
       <div class="flex items-center gap-2 max-w-3xl mx-auto px-4">
+        <select
+          v-model="selectedClient"
+          class="border border-gray-300 text-blue-400 rounded-md py-2 px-4"
+        >
+          <option value="all" disabled>Seleciona o cliente</option>
+          <option v-for="client in authStore.user.clients" :key="client.id" :value="client">
+            {{ client.name }}
+          </option>
+        </select>
         <input
           v-model="newMessage"
           class="flex-grow text-black border border-gray-300 rounded-full py-2 px-4"
@@ -144,10 +169,19 @@ onError((error) => {
           @keyup.enter="send"
         />
         <button
-          class="bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-full"
+          :class="[
+            'bg-blue-500 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-full',
+            { 'opacity-50 cursor-not-allowed': sendMessageLoading },
+          ]"
           @click="send"
+          :disabled="sendMessageLoading"
         >
-          Send
+          <span
+            v-if="sendMessageLoading"
+            class="spinner-border spinner-border-sm text-white"
+            role="status"
+          ></span>
+          <span v-else>Send</span>
         </button>
       </div>
     </div>
